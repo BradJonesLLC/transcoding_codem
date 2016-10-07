@@ -1,0 +1,6 @@
+name: Codem integration
+description: 'Provides integration with the Codem transcoder.'
+type: module
+core: 8.x
+dependencies:
+ - transcoding:transcoding
