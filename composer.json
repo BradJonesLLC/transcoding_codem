@@ -12,7 +12,7 @@
         }
     ],
     "require": {
-        "drupal/transcoding": "1.x-dev",
+        "drupal/transcoding": "1.x-dev"
     }
 }
 
