@@ -2,7 +2,6 @@
 
 namespace Drupal\transcoding_codem\Plugin\Transcoder;
 
-use Drupal\Component\Utility\NestedArray;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -12,7 +11,7 @@ use Drupal\transcoding\Annotation\Transcoder;
 /**
  * @Transcoder (
  *   id = "codem",
- *   label = "Codem
+ *   label = "Codem"
  * )
  */
 class Codem extends TranscoderBase {
@@ -24,7 +23,7 @@ class Codem extends TranscoderBase {
    */
   public function defaultConfiguration() {
     return [
-      'schedulerUrl' => '',
+      'scheduler' => '',
     ];
   }
 
@@ -45,17 +44,18 @@ class Codem extends TranscoderBase {
     $form['scheduler'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Scheduler base URL'),
-      '#default_value' => $values['schedulerUrl'],
-      '#attributes' => ['placeholder' => 'https://scheduler,']
+      '#default_value' => $values['scheduler'],
+      '#attributes' => ['placeholder' => 'https://scheduler']
     ];
+    return $form;
   }
 
   /**
    * @inheritDoc
    */
   public function validateConfigurationForm(array &$form, FormStateInterface $form_state) {
-    if (!UrlHelper::isValid($form_state->getValue('scheduler'))) {
-      $form_state->setErrorByName('scheduler', $this->t('Scheduler URL is invalid.'));
+    if (!UrlHelper::isValid($form_state->getValue('scheduler'), TRUE)) {
+      $form_state->setErrorByName('scheduler', $this->t('Scheduler URL is invalid. Must be absolute.'));
     }
   }
 
@@ -63,7 +63,7 @@ class Codem extends TranscoderBase {
    * @inheritDoc
    */
   public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
-    $config = NestedArray::getValue($form_state->getValues(), $form['#parents']);
+    $config = $form_state->getValues();
     if ($config) {
       $this->setConfiguration($config);
     }
