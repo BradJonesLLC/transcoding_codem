@@ -2,13 +2,19 @@
 
 namespace Drupal\transcoding_codem\Plugin\Transcoder;
 
+use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\PrivateKey;
+use Drupal\Core\Site\Settings;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\transcoding\CodemClient;
+use Drupal\Core\Url;
+use Drupal\transcoding_codem\CodemClient;
 use Drupal\transcoding\Plugin\TranscoderBase;
 use Drupal\transcoding\Annotation\Transcoder;
 use Drupal\transcoding\TranscodingStatus;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * @Transcoder (
@@ -16,9 +22,35 @@ use Drupal\transcoding\TranscodingStatus;
  *   label = "Codem"
  * )
  */
-class Codem extends TranscoderBase {
+class Codem extends TranscoderBase implements ContainerFactoryPluginInterface {
 
   use StringTranslationTrait;
+
+  /**
+   * The private key service.
+   *
+   * @var \Drupal\Core\PrivateKey
+   */
+  protected $privateKey;
+
+  /**
+   * @inheritDoc
+   */
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, PrivateKey $privateKey) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition);
+    $this->privateKey = $privateKey;
+  }
+
+  /**
+   * @inheritDoc
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static(
+      $configuration,
+      $plugin_id,
+      $plugin_definition,
+      $container->get('private_key')
+    );  }
 
   /**
    * @inheritDoc
@@ -80,6 +112,16 @@ class Codem extends TranscoderBase {
       '#title' => $this->t('Input'),
       '#required' => TRUE,
     ];
+    $form['output'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Output file'),
+      '#required' => TRUE,
+    ];
+    $form['preset'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Preset'),
+      '#required' => TRUE,
+    ];
     return $form;
   }
 
@@ -95,13 +137,19 @@ class Codem extends TranscoderBase {
    */
   public function processJob($job) {
     $data = $job->getServiceData();
-    if ($job->status == TranscodingStatus::PENDING) {
-      // @todo - Create the notify callback url.
-      $notify = 'http://something';
-      $scheduledJob = (new CodemClient($this->getConfiguration()['scheduler']))
-        ->createJob($data['input'], $data['output'], $data['preset'], $notify);
-      $job->status = TranscodingStatus::IN_PROGRESS;
-      $data['scheduled_id'] = $scheduledJob->id;
+    if ($job->status->getString() == TranscodingStatus::PENDING) {
+      $token = Crypt::hmacBase64($job->id(), $this->privateKey->get() . Settings::getHashSalt());
+      $notify = Url::fromRoute('transcoding_codem.callback_controller_process', ['transcoding_job' => $job->id(), 'key' => $token], ['absolute' => TRUE]);
+      try {
+        $scheduledJob = (new CodemClient($this->getConfiguration()['scheduler']))
+          ->createJob($data['input'], $data['output'], $data['preset'], $notify->toString());
+        $job->status = TranscodingStatus::IN_PROGRESS;
+        $data['scheduled_id'] = $scheduledJob->id;
+      }
+      catch (\Exception $e) {
+        $job->status = TranscodingStatus::FAILED;
+        $data['error'] = $e->getMessage();
+      }
       $job->service_data = $data;
       $job->save();
     }

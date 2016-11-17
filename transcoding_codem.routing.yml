@@ -1,0 +1,7 @@
+transcoding_codem.callback_controller_process:
+  path: '/transcoding_codem/{transcoding_job}/{token}'
+  defaults:
+    _controller: '\Drupal\transcoding_codem\Controller\CallbackController::process'
+    _title: 'Callback'
+  requirements:
+    _permission: 'access content'

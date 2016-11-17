@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\transcoding;
+namespace Drupal\transcoding_codem;
 
 use GuzzleHttp\Client;
 
@@ -29,8 +29,8 @@ class CodemClient {
   public function createJob($input, $output, $preset, $notify) {
     $data = [
       'input' => $input,
-      'output' => $output,
-      'preset' => $preset,
+      'destination_file' => $output,
+      'preset_id' => $preset,
       'notify' => $notify,
     ];
     return $this->post('jobs', $data)->job;
@@ -38,11 +38,16 @@ class CodemClient {
 
   protected function post($endpoint, $data) {
     try {
-      $response = $this->client->post($endpoint, $data);
+      $response = $this->client->post($endpoint, [
+        'form_params' => $data,
+        'headers' => [
+          'Accept' => '*/*'
+        ],
+      ]);
       return \GuzzleHttp\json_decode($response->getBody());
     }
     catch (\Exception $e) {
-
+      throw new \Exception('Job creation failed', $e->getCode(), $e);
     }
   }
 
