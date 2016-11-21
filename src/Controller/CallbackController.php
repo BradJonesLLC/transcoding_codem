@@ -6,11 +6,13 @@ use Drupal\Component\Utility\Crypt;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Site\Settings;
 use Drupal\transcoding\Entity\TranscodingJob;
+use GuzzleHttp\Psr7\Response;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\transcoding\TranscodingMedia;
 use Drupal\Core\PrivateKey;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 use Symfony\Component\Translation\Exception\InvalidResourceException;
 
 /**
@@ -64,9 +66,19 @@ class CallbackController extends ControllerBase {
     if (!$job = TranscodingJob::load($transcoding_job)) {
       throw new InvalidResourceException('Invalid job.');
     }
+    if ($this->currentRequest->getMethod() != 'POST') {
+      throw new MethodNotAllowedHttpException(['POST']);
+    }
+    $report = $this->currentRequest->request->all();
+    if (!in_array($report['state'], ['success', 'failed', 'processing'])) {
+      return;
+    }
+    // Mark success as processed, since we'll move it on the next cron.
+    $status = $report['state'] == 'success' ? 'processed' : $report['state'];
     $data = $job->getServiceData();
-    $data['result'] = \GuzzleHttp\json_decode($this->currentRequest->getContent())->job;
-    $job->set('status', 'processed')->save();
+    $data['result'] = $report;
+    $job->setServiceData($data)->set('status', $status)->save();
+    return new Response();
   }
 
 }

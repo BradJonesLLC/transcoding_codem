@@ -167,7 +167,7 @@ class Codem extends TranscoderBase implements ContainerFactoryPluginInterface {
     if ($status == 'processed') {
       // Event subscription to TranscodingJobEvents::COMPLETE
       // required if the destination file is not on a locally-accessible filesystem.
-      $uri = $job->getServiceData()['result']->destination_file;
+      $uri = $job->getServiceData()['result']['destination_file'];
       $this->transcodingMedia->complete($job, $uri);
     }
   }
