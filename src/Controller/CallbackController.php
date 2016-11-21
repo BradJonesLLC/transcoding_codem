@@ -65,7 +65,7 @@ class CallbackController extends ControllerBase {
       throw new InvalidResourceException('Invalid job.');
     }
     $data = $job->getServiceData();
-    $data['result'] = \GuzzleHttp\json_decode($this->currentRequest->getContent());
+    $data['result'] = \GuzzleHttp\json_decode($this->currentRequest->getContent())->job;
     $job->set('status', 'processed')->save();
   }
 
