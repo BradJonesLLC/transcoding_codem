@@ -2,10 +2,16 @@
 
 namespace Drupal\transcoding_codem\Controller;
 
+use Drupal\Component\Utility\Crypt;
 use Drupal\Core\Controller\ControllerBase;
+use Drupal\Core\Site\Settings;
+use Drupal\transcoding\Entity\TranscodingJob;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\transcoding\TranscodingMedia;
 use Drupal\Core\PrivateKey;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\Translation\Exception\InvalidResourceException;
 
 /**
  * Class CallbackController.
@@ -15,24 +21,25 @@ use Drupal\Core\PrivateKey;
 class CallbackController extends ControllerBase {
 
   /**
-   * Drupal\transcoding\TranscodingMedia definition.
-   *
-   * @var Drupal\transcoding\TranscodingMedia
-   */
-  protected $transcoding_media;
-
-  /**
    * Drupal\Core\PrivateKey definition.
    *
-   * @var Drupal\Core\PrivateKey
+   * @var \Drupal\Core\PrivateKey
    */
   protected $private_key;
+
+  /**
+   * The current request.
+   *
+   * @var \Symfony\Component\HttpFoundation\Request
+   */
+  protected $currentRequest;
+
   /**
    * {@inheritdoc}
    */
-  public function __construct(TranscodingMedia $transcoding_media, PrivateKey $private_key) {
-    $this->transcoding_media = $transcoding_media;
+  public function __construct(PrivateKey $private_key, RequestStack $requestStack) {
     $this->private_key = $private_key;
+    $this->currentRequest = $requestStack->getCurrentRequest();
   }
 
   /**
@@ -40,22 +47,26 @@ class CallbackController extends ControllerBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('transcoding.media'),
-      $container->get('private_key')
+      $container->get('private_key'),
+      $container->get('request_stack')
     );
   }
 
   /**
-   * Process.
-   *
-   * @return string
-   *   Return Hello string.
+   * Process the incoming report.
    */
-  public function process($transcoding_job, $key) {
-    return [
-      '#type' => 'markup',
-      '#markup' => $this->t('Implement method: process with parameter(s): $transcoding_job, $key'),
-    ];
+  public function process($transcoding_job, $token) {
+    // Check the token.
+    $our_token = Crypt::hmacBase64($transcoding_job, $this->private_key->get() . Settings::getHashSalt());
+    if ($our_token != $token) {
+      throw new AccessDeniedHttpException('Invalid token.');
+    }
+    if (!$job = TranscodingJob::load($transcoding_job)) {
+      throw new InvalidResourceException('Invalid job.');
+    }
+    $data = $job->getServiceData();
+    $data['result'] = \GuzzleHttp\json_decode($this->currentRequest->getContent());
+    $job->set('status', 'processed')->save();
   }
 
 }

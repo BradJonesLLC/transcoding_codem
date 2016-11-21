@@ -29,8 +29,8 @@ class CodemClient {
   public function createJob($input, $output, $preset, $notify) {
     $data = [
       'input' => $input,
-      'destination_file' => $output,
-      'preset_id' => $preset,
+      'output' => $output,
+      'preset' => $preset,
       'notify' => $notify,
     ];
     return $this->post('jobs', $data)->job;
