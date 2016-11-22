@@ -69,16 +69,17 @@ class CallbackController extends ControllerBase {
     if ($this->currentRequest->getMethod() != 'POST') {
       throw new MethodNotAllowedHttpException(['POST']);
     }
+    $response = new Response();
     $report = $this->currentRequest->request->all();
     if (!in_array($report['state'], ['success', 'failed', 'processing'])) {
-      return;
+      return $response;
     }
     // Mark success as processed, since we'll move it on the next cron.
     $status = $report['state'] == 'success' ? 'processed' : $report['state'];
     $data = $job->getServiceData();
     $data['result'] = $report;
     $job->setServiceData($data)->set('status', $status)->save();
-    return new Response();
+    return $response;
   }
 
 }
